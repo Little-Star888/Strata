@@ -41,6 +41,14 @@
 
 FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
 
+# cn deployment (deploy/v0.1.41-cn): the build host cannot reach archive.ubuntu.com or
+# pypi.org, so apt and pip use the Tsinghua mirrors below instead. Everything else
+# (the ~84 GB model download, the MTP layer, the vision encoder) is chosen at docker
+# run with STRATA_SOURCE / HF_ENDPOINT and needs no source change.
+RUN sed -i 's|archive.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g; s|security.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g' \
+        /etc/apt/sources.list.d/ubuntu.sources
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
 # STRATA_EXECV=1: setup.py replaces itself with the server, so the server is PID 1
 # and docker stop's SIGTERM reaches it (see setup.start). Normal Linux starts, which
 # don't set it, keep spawning the server as a child.
