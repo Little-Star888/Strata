@@ -61,3 +61,6 @@ build-vision-cuda12.bat
 
 /.ccache/
 /.rocm-win/
+
+# compose runtime config (may hold an API key) - copy .env.example instead
+/.env
