@@ -1,0 +1,41 @@
+# docker compose for the cn deployment (deploy/v0.1.41-cn).
+# Same container the README's docker run creates; every choice is an env var
+# in .env (copy .env.example). Requires compose v2 (the `docker compose` command):
+# `gpus: all` needs v2.30+, and the legacy docker-compose 1.29 does not know it.
+#
+# Switching models or context: edit .env, then `docker compose up -d` (it recreates
+# the container; model files on the strata-data volume are reused, never re-downloaded).
+# REINSTALL=1 is one-shot: set it only for the one up that changes an installed
+# model's settings, remove it again after.
+
+services:
+  strata:
+    build:
+      context: .
+      args: { CUDA_ARCHITECTURES: "120" }   # RTX 50 only; the engine is fat otherwise
+    image: strata:v0.1.41-cn.1
+    container_name: strata-cn
+    restart: unless-stopped
+    gpus: all
+    ulimits:
+      memlock: -1          # the expert arena locks pages in RAM
+    ports:
+      - "127.0.0.1:8080:8080"   # loopback only: no API key, never past 127.0.0.1 (AGENTS.md)
+    environment:
+      MODEL: ${MODEL:-IQ3_S}
+      FAMILY: ${FAMILY:-}              # unsloth tiers need FAMILY=unsloth; empty = qwen
+      CONTEXT: ${CONTEXT:-262144}
+      REINSTALL: ${REINSTALL:-}
+      STRATA_SOURCE: ${STRATA_SOURCE:-modelscope}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      GPU: ${GPU:-}
+      GPUS: ${GPUS:-}
+      KV: ${KV:-}
+      LOW_RAM: ${LOW_RAM:-auto}
+      API_KEY: ${API_KEY:-}
+    volumes:
+      - strata-data:/data
+
+volumes:
+  strata-data:
+    external: true          # created by the earlier docker run; keeps the 286 GB of models
