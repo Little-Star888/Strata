@@ -20,7 +20,7 @@ services:
     ulimits:
       memlock: -1          # the expert arena locks pages in RAM
     ports:
-      - "127.0.0.1:8080:8080"   # loopback only: no API key, never past 127.0.0.1 (AGENTS.md)
+      - "8089:8080"   # LAN: 0.0.0.0 host side; API_KEY in .env is required past 127.0.0.1 (AGENTS.md)
     environment:
       MODEL: ${MODEL:-IQ3_S}
       FAMILY: ${FAMILY:-}              # unsloth tiers need FAMILY=unsloth; empty = qwen
