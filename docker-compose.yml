@@ -28,11 +28,19 @@ services:
       REINSTALL: ${REINSTALL:-}
       STRATA_SOURCE: ${STRATA_SOURCE:-modelscope}
       PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      VISION: ${VISION:-no}
+      KV: ${KV:-}
+      KV_STREAMING: ${KV_STREAMING:-}
       GPU: ${GPU:-}
       GPUS: ${GPUS:-}
-      KV: ${KV:-}
+      LAYER_SPLIT: ${LAYER_SPLIT:-}
       LOW_RAM: ${LOW_RAM:-auto}
+      RESIDENT_BUDGET_GIB: ${RESIDENT_BUDGET_GIB:-}
       API_KEY: ${API_KEY:-}
+      GGUF_DIR: ${GGUF_DIR:-}
+      CONFIG: ${CONFIG:-}
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
     volumes:
       - strata-data:/data
 
