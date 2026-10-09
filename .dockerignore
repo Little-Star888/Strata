@@ -17,7 +17,11 @@ __pycache__/
 /mtp/
 /models/
 /Strata-data/
-third_party/llama.cpp/
+# cn deployment (deploy/v0.1.41-cn): third_party/llama.cpp is preplaced at the pinned
+# commit so the build needs no network. Upstream excludes it and downloads the zip
+# from github inside the build, which times out on this host (its build-sandbox
+# network cannot reach github even though the host can).
+# third_party/llama.cpp/
 third_party/*.zip
 *.done
 *.log
