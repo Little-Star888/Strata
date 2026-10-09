@@ -39,7 +39,11 @@
 # -e GPUS=0,2. A volume set up for one card switches to the pair on its first start
 # on a two-card host unless GPU or GPUS pins it. LOW_RAM=on runs on one card.
 
-FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
+# cn deployment: the base image comes from the owner's Aliyun registry mirror of
+# nvidia/cuda (same official image, tag 13.0.2; upstream pins 13.0.0 — patch bump
+# only, and setup.py:3021 states 13.0/13.1/13.2 builds are equivalent). docker hub
+# is unreachable from this host without a slow pull.
+FROM crpi-o3t15cpzlnzh32nn.cn-shanghai.personal.cr.aliyuncs.com/little_star/cuda:13.0.2-devel-ubuntu24.04
 
 # cn deployment (deploy/v0.1.41-cn): the build host cannot reach archive.ubuntu.com or
 # pypi.org, so apt and pip use the Tsinghua mirrors below instead. Everything else
