@@ -1,0 +1,45 @@
+# docker compose for the cn deployment (deploy/v0.1.41-cn).
+# Same container the README's docker run creates; every choice is an env var
+# in .env (copy .env.example). Requires compose v2 (the `docker compose` command):
+# `gpus: all` needs v2.30+, and the legacy docker-compose 1.29 does not know it.
+#
+# Switching models or context: edit .env, then `docker compose up -d` (it recreates
+# the container; model files on the strata-data volume are reused, never re-downloaded).
+# REINSTALL=1 is one-shot: set it only for the one up that changes an installed
+# model's settings, remove it again after.
+
+services:
+  strata:
+    build:
+      context: .
+      args: { CUDA_ARCHITECTURES: "120" }   # RTX 50 only; the engine is fat otherwise
+    image: strata:v0.1.43-cn.1
+    container_name: strata-cn
+    restart: unless-stopped
+    gpus: all
+    ulimits:
+      memlock: -1          # the expert arena locks pages in RAM
+    ports:
+      - "${HOST_PORT:-8089}:8080"   # host side: LAN 0.0.0.0 by default; set API_KEY in .env past 127.0.0.1 (AGENTS.md)
+    environment:
+      MODEL: ${MODEL:-IQ3_S}
+      FAMILY: ${FAMILY:-}              # unsloth tiers need FAMILY=unsloth; empty = qwen
+      CONTEXT: ${CONTEXT:-262144}
+      REINSTALL: ${REINSTALL:-}
+      STRATA_SOURCE: ${STRATA_SOURCE:-modelscope}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      VISION: ${VISION:-no}
+      KV: ${KV:-}
+      KV_STREAMING: ${KV_STREAMING:-}
+      GPU: ${GPU:-}
+      GPUS: ${GPUS:-}
+      LAYER_SPLIT: ${LAYER_SPLIT:-}
+      LOW_RAM: ${LOW_RAM:-auto}
+      RESIDENT_BUDGET_GIB: ${RESIDENT_BUDGET_GIB:-}
+      API_KEY: ${API_KEY:-}
+      GGUF_DIR: ${GGUF_DIR:-}
+      CONFIG: ${CONFIG:-}
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
+    volumes:
+      - ./models:/data      # host-side data dir: the three tiers, config, packs and bench results live here (git-ignored)
