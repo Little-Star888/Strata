@@ -30,6 +30,8 @@ td.log
 /build/
 /third_party/llama.cpp
 /models/
+# cn: the deployment's secrets (API key) - never commit
+/.env
 /packs/
 /mtp/
 /run-*.bat

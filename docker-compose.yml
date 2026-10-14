@@ -1,0 +1,96 @@
+# docker compose for the cn deployment (deploy/v0.1.44.1-cn).
+# Single stack on the upstream engine (0.1.44.1, NVFP4 included): the GGUF tiers
+# (IQ3_S / UD-*), the NVFP4 packs (GPTQ, plus mix and q8 from the fork's packs),
+# NVFP4-NVIDIA and the Qwen3.6-35B-A3B family as new downloads. Every choice is
+# an env var in .env (copy .env.example). Requires compose v2 (`gpus: all` needs
+# v2.30+).
+#
+# Switching models: edit .env, then `docker compose up -d` (recreates the
+# container; model files in ./models are reused, never re-downloaded).
+# REINSTALL=1 is one-shot: only for the up that regenerates an installed
+# model's settings (context, vision, api key), remove it again after.
+#
+# Config reuse: the configs that moved from the fork deployment (/data/config)
+# are used verbatim - context 524288, vision, api key and the uncensored
+# control vector are already baked into them. A model without a config there
+# is installed by setup (--model), and UNCENSORED=on injects the fork's
+# control vector into the generated config (cn-apply-uncensor.py; the vector
+# ships in this branch at data/uncensor/, which lands at the fork's in-image
+# path /opt/strata/data/uncensor/).
+
+services:
+  strata:
+    build:
+      context: .
+      args: { CUDA_ARCHITECTURES: "120" }   # RTX 50 only; the engine is fat otherwise
+    image: strata:v0.1.44.1-cn.1
+    container_name: strata-cn
+    restart: unless-stopped
+    gpus: all
+    ulimits:
+      memlock: -1          # the expert arena locks pages in RAM
+    ports:
+      - "${HOST_PORT:-8089}:8080"   # LAN by default: keep API_KEY set in .env (AGENTS.md)
+    environment:
+      MODEL: ${MODEL:-NVFP4}        # IQ3_S | UD-IQ4_XS | UD-Q4_K_XL | NVFP4 | NVFP4-MIX | NVFP4-Q8 | NVFP4-NVIDIA | UD-Q5_K_XL | UD-Q6_K_XL | Q8_0 | Qwen3.6 tiers
+      CONTEXT: ${CONTEXT:-524288}   # used only when setup generates a new config
+      VISION: ${VISION:-yes}        # ditto; the moved configs already carry theirs
+      UNCENSORED: ${UNCENSORED:-on} # injects the fork's control vector into generated configs; the moved configs have it baked in
+      REINSTALL: ${REINSTALL:-}
+      API_KEY: ${API_KEY:-}
+      STRATA_SOURCE: ${STRATA_SOURCE:-modelscope}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      STRATA_ADAPT_OVERLAP: ${STRATA_ADAPT_OVERLAP:-}    # the 0.1.43 opt-in decode overlap; A/B on this card before keeping
+      STRATA_ROUTE_TAIL_SKIP: ${STRATA_ROUTE_TAIL_SKIP:-}
+      STRATA_MMQ_KQ: ${STRATA_MMQ_KQ:-}                  # K-quant prompt kernels (UD-Q4/Q5/Q6_K_XL); opt-in, prompts x1.3-1.7 measured on AMD
+      GPU: ${GPU:-}
+      GPUS: ${GPUS:-}
+      LOW_RAM: ${LOW_RAM:-auto}
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
+    volumes:
+      - ./models:/data      # host-side data dir: every pack, config and bench result lives here (git-ignored)
+    entrypoint:
+      - bash
+      - -c
+      - |-
+        set -e; cd /opt/strata
+        # MODEL -> an existing config (moved from the fork deployment): reuse it
+        # verbatim; its context/vision/api-key/uncensored are already baked in.
+        case "$${MODEL:-NVFP4}" in
+          IQ3_S)      CFG=/data/config/strata-iq3_s.json ;;
+          UD-IQ4_XS)  CFG=/data/config/strata-unsloth-UD-IQ4_XS.json ;;
+          UD-Q4_K_XL) CFG=/data/config/strata-unsloth-UD-Q4_K_XL.json ;;
+          NVFP4)      CFG=/data/config/strata-qwen-nvfp4-gptq-NVFP4.json ;;
+          NVFP4-MIX)  CFG=/data/config/strata-qwen-nvfp4-mix-NVFP4.json ;;
+          NVFP4-Q8)   CFG=/data/config/strata-qwen-q8-NVFP4.json ;;
+          *)          CFG="" ;;
+        esac
+        rm -f /opt/strata/strata-*.json
+        if [ -n "$$CFG" ] && [ -f "$$CFG" ] && [ "$${REINSTALL:-0}" != "1" ]; then
+          ln -sfn "$$CFG" "/opt/strata/$$(basename "$$CFG")"
+        else
+          if [ "$$MODEL" = "NVFP4-MIX" ] || [ "$$MODEL" = "NVFP4-Q8" ]; then
+            echo "cn: no config for $$MODEL and upstream setup cannot install it (no such entry)." >&2
+            echo "cn: restore /data/config from the fork deployment, or run this model there." >&2
+            exit 1
+          fi
+          .venv/bin/python setup.py --setup --yes --model "$${MODEL:-NVFP4}" \
+            --context "$${CONTEXT:-524288}" --vision "$${VISION:-yes}" --data-dir /data \
+            --host "$${HOST:-0.0.0.0}" --port "$${PORT:-8080}" --no-start --low-ram auto \
+            --api-key "$${API_KEY:-}" --source "$${STRATA_SOURCE:-modelscope}"
+          GEN=$$(ls -t /opt/strata/strata-*.json | head -1)
+          if [ -n "$$CFG" ]; then
+            cp "$$GEN" "$$CFG"            # keep the canonical (mapped) config name
+            GEN=$$CFG
+          else
+            cp "$$GEN" "/data/config/$$(basename "$$GEN")"
+            GEN="/data/config/$$(basename "$$GEN")"
+          fi
+          if [ "$${UNCENSORED:-on}" = "on" ]; then
+            .venv/bin/python /opt/strata/cn-apply-uncensor.py "$$GEN"
+          fi
+          rm -f /opt/strata/strata-*.json
+          ln -sfn "$$GEN" "/opt/strata/$$(basename "$$GEN")"
+        fi
+        exec .venv/bin/python setup.py --port "$${PORT:-8080}"
